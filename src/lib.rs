@@ -11,7 +11,7 @@ use context::WgpuContext;
 use lazy_regex::regex;
 use num::Integer;
 use pp::{SourceMap, WGSLError};
-use wgpu::Maintain;
+use wgpu::{Maintain, SubmissionIndex};
 use std::collections::HashMap;
 use std::mem::{size_of, take};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -186,7 +186,8 @@ impl WgpuToyRenderer {
                 SurfaceError::Timeout => log::warn!("Surface Timeout"),
             },
             Ok(f) => {
-                let staging_buffer = self.render_to(f);
+                let (staging_buffer, (f, _)) = self.render_to(f);
+                f.present();
                 Self::postrender(
                     staging_buffer,
                     self.screen_width * self.screen_height,
@@ -197,7 +198,7 @@ impl WgpuToyRenderer {
         }
     }
 
-    pub fn render_to(&mut self, frame: wgpu::SurfaceTexture) -> Option<wgpu::Buffer> {
+    pub fn render_to(&mut self, frame: wgpu::SurfaceTexture) -> (Option<wgpu::Buffer>, (wgpu::SurfaceTexture, SubmissionIndex)) {
         let mut encoder = self.wgpu.device.create_command_encoder(&Default::default());
         self.bindings.stage(&self.wgpu.queue);
         if self.bindings.time.host.frame % STATS_PERIOD == 0 {
@@ -308,9 +309,9 @@ impl WgpuToyRenderer {
             &frame.texture.create_view(&Default::default()),
         );
         let i = self.wgpu.queue.submit(Some(encoder.finish()));
-        self.wgpu.device.poll(Maintain::WaitForSubmissionIndex(i));
-        frame.present();
-        staging_buffer
+        //self.wgpu.device.poll(Maintain::WaitForSubmissionIndex(i));
+        //frame.present();
+        (staging_buffer, (frame, i))
     }
 
     async fn postrender(
