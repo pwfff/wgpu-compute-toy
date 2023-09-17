@@ -11,6 +11,7 @@ use context::WgpuContext;
 use lazy_regex::regex;
 use num::Integer;
 use pp::{SourceMap, WGSLError};
+use wgpu::Maintain;
 use std::collections::HashMap;
 use std::mem::{size_of, take};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -306,7 +307,8 @@ impl WgpuToyRenderer {
             &mut encoder,
             &frame.texture.create_view(&Default::default()),
         );
-        self.wgpu.queue.submit(Some(encoder.finish()));
+        let i = self.wgpu.queue.submit(Some(encoder.finish()));
+        self.wgpu.device.poll(Maintain::WaitForSubmissionIndex(i));
         frame.present();
         staging_buffer
     }
